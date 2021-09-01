@@ -1,0 +1,194 @@
+﻿// Each #kernel tells which function to compile; you can have many kernels
+#pragma kernel CSMain
+
+// Create a RenderTexture with enableRandomWrite flag and set it
+// with cs.SetTexture
+StructuredBuffer<float2> particle_pos;
+StructuredBuffer<float2> particle_vel;
+StructuredBuffer<float> particle_J;
+StructuredBuffer<float4> particle_C;
+
+RWStructuredBuffer<float> particle_debug;
+
+RWStructuredBuffer<int> grid_vel_x;
+RWStructuredBuffer<int> grid_vel_y;
+RWStructuredBuffer<int> grid_mass;
+
+int Nx;
+
+float dx;
+float particle_vol;
+float dt;
+float E;
+float particle_mass;
+
+int grid_vel_scale;
+
+[numthreads(256,1, 1)]
+void CSMain(uint3 id : SV_DispatchThreadID)
+{    
+    float px = particle_pos[id.x].x * Nx;
+    float py = particle_pos[id.x].y * (float) Nx;
+    int bx = (px - 0.5f);
+    int by = (py - 0.5f);
+    float fx = px - bx;
+    float fy = py - by;
+    
+    float stress = -dt * 4 * E * particle_vol * (particle_J[id.x] - 1.0) * Nx * Nx;
+    float affine00 = stress + particle_mass * particle_C[id.x].x;
+    float affine01 = particle_mass * particle_C[id.x].y;
+    float affine10 = particle_mass * particle_C[id.x].z;
+    float affine11 = stress + particle_mass * particle_C[id.x].w;
+    
+    float wx0 = 0.5 * (1.5 - fx) * (1.5 - fx);
+    float wx1 = 0.75 - (fx - 1.0) * (fx - 1.0);
+    float wx2 = 0.5 * (fx - 0.5) * (fx - 0.5);
+    
+    float wy0 = 0.5 * (1.5 - fy) * (1.5 - fy);
+    float wy1 = 0.75 - (fy - 1.0) * (fy - 1.0);
+    float wy2 = 0.5 * (fy - 0.5) * (fy - 0.5);
+    
+    // 手动 unloop
+    int i = 0, j = 0;
+    float w = wx0 * wy0;
+    px = (i - fx) * dx;
+    py = (j - fy) * dx;
+    int idx = (by + j) * Nx + (bx + i);
+    
+    float affine = affine00 * px + affine01 * py;
+    int term =  (w * (particle_mass * particle_vel[id.x].x + affine) * grid_vel_scale);
+    
+    
+    InterlockedAdd(grid_vel_x[idx], term);
+    affine = affine10 * px + affine11 * py;
+    term =  (w * (particle_mass * particle_vel[id.x].y + affine) * grid_vel_scale);
+    InterlockedAdd(grid_vel_y[idx], term);
+    term = w * particle_mass * (float) grid_vel_scale;
+    InterlockedAdd(grid_mass[idx], term);
+    particle_debug[id.x] = w;
+    
+
+    i = 1;
+    w = wx1 * wy0;
+    px = (i - fx) * dx;
+    py = (j - fy) * dx;
+    idx = (by + j) * Nx + (bx + i);
+    
+    affine = affine00 * px + affine01 * py;
+    term =  (w * (particle_mass * particle_vel[id.x].x + affine) * grid_vel_scale);
+    InterlockedAdd(grid_vel_x[idx], term);
+    affine = affine10 * px + affine11 * py;
+    term =  (w * (particle_mass * particle_vel[id.x].y + affine) * grid_vel_scale);
+    InterlockedAdd(grid_vel_y[idx], term);
+    term = w * particle_mass * grid_vel_scale;
+    InterlockedAdd(grid_mass[idx], term);
+    
+    i = 2;
+    w = wx2 * wy0;
+    px = (i - fx) * dx;
+    py = (j - fy) * dx;
+    idx = (by + j) * Nx + (bx + i);
+    
+    affine = affine00 * px + affine01 * py;
+    term =  (w * (particle_mass * particle_vel[id.x].x + affine) * grid_vel_scale);
+    InterlockedAdd(grid_vel_x[idx], term);
+    affine = affine10 * px + affine11 * py;
+    term =  (w * (particle_mass * particle_vel[id.x].y + affine) * grid_vel_scale);
+    InterlockedAdd(grid_vel_y[idx], term);
+    term = w * particle_mass * grid_vel_scale;
+    InterlockedAdd(grid_mass[idx], term);
+
+    i = 0;
+    j = 1;
+    w = wx0 * wy1;
+    px = (i - fx) * dx;
+    py = (j - fy) * dx;
+    idx = (by + j) * Nx + (bx + i);
+    
+    affine = affine00 * px + affine01 * py;
+    term =  (w * (particle_mass * particle_vel[id.x].x + affine) * grid_vel_scale);
+    InterlockedAdd(grid_vel_x[idx], term);
+    affine = affine10 * px + affine11 * py;
+    term =  (w * (particle_mass * particle_vel[id.x].y + affine) * grid_vel_scale);
+    InterlockedAdd(grid_vel_y[idx], term);
+    term = w * particle_mass * grid_vel_scale;
+    InterlockedAdd(grid_mass[idx], term);
+     
+    i = 1;
+    w = wx1 * wy1;
+    px = (i - fx) * dx;
+    py = (j - fy) * dx;
+    idx = (by + j) * Nx + (bx + i);
+    
+    affine = affine00 * px + affine01 * py;
+    term =  (w * (particle_mass * particle_vel[id.x].x + affine) * grid_vel_scale);
+    InterlockedAdd(grid_vel_x[idx], term);
+    affine = affine10 * px + affine11 * py;
+    term =  (w * (particle_mass * particle_vel[id.x].y + affine) * grid_vel_scale);
+    InterlockedAdd(grid_vel_y[idx], term);
+    term = w * particle_mass * grid_vel_scale;
+    InterlockedAdd(grid_mass[idx], term);
+   
+    i = 2;
+    w = wx2 * wy1;
+    px = (i - fx) * dx;
+    py = (j - fy) * dx;
+    idx = (by + j) * Nx + (bx + i);
+    
+    affine = affine00 * px + affine01 * py;
+    term =  (w * (particle_mass * particle_vel[id.x].x + affine) * grid_vel_scale);
+    InterlockedAdd(grid_vel_x[idx], term);
+    affine = affine10 * px + affine11 * py;
+    term =  (w * (particle_mass * particle_vel[id.x].y + affine) * grid_vel_scale);
+    InterlockedAdd(grid_vel_y[idx], term);
+    term = w * particle_mass * grid_vel_scale;
+    InterlockedAdd(grid_mass[idx], term);
+    
+    i = 0;
+    j = 2;
+    w = wx0 * wy2;
+    px = (i - fx) * dx;
+    py = (j - fy) * dx;
+    idx = (by + j) * Nx + (bx + i);
+    
+    affine = affine00 * px + affine01 * py;
+    term =  (w * (particle_mass * particle_vel[id.x].x + affine) * grid_vel_scale);
+    InterlockedAdd(grid_vel_x[idx], term);
+    affine = affine10 * px + affine11 * py;
+    term =  (w * (particle_mass * particle_vel[id.x].y + affine) * grid_vel_scale);
+    InterlockedAdd(grid_vel_y[idx], term);
+    term = w * particle_mass * grid_vel_scale;
+    InterlockedAdd(grid_mass[idx], term);
+    
+    i = 1;
+    w = wx1 * wy2;
+    px = (i - fx) * dx;
+    py = (j - fy) * dx;
+    idx = (by + j) * Nx + (bx + i);
+    
+    affine = affine00 * px + affine01 * py;
+    term =  (w * (particle_mass * particle_vel[id.x].x + affine) * grid_vel_scale);
+    InterlockedAdd(grid_vel_x[idx], term);
+    affine = affine10 * px + affine11 * py;
+    term =  (w * (particle_mass * particle_vel[id.x].y + affine) * grid_vel_scale);
+    InterlockedAdd(grid_vel_y[idx], term);
+    term = w * particle_mass * grid_vel_scale;
+    InterlockedAdd(grid_mass[idx], term);
+    
+    i = 2;
+    w = wx2 * wy2;
+    px = (i - fx) * dx;
+    py = (j - fy) * dx;
+    idx = (by + j) * Nx + (bx + i);
+    
+    affine = affine00 * px + affine01 * py;
+    term =  (w * (particle_mass * particle_vel[id.x].x + affine) * grid_vel_scale);
+    InterlockedAdd(grid_vel_x[idx], term);
+    affine = affine10 * px + affine11 * py;
+    term =  (w * (particle_mass * particle_vel[id.x].y + affine) * grid_vel_scale);
+    InterlockedAdd(grid_vel_y[idx], term);
+    term = w * particle_mass * grid_vel_scale;
+    InterlockedAdd(grid_mass[idx], term);
+
+   
+}

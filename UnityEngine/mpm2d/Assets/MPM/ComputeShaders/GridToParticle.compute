@@ -1,0 +1,177 @@
+﻿// Each #kernel tells which function to compile; you can have many kernels
+#pragma kernel CSMain
+
+RWStructuredBuffer<float2> particle_pos;
+RWStructuredBuffer<float2> particle_vel;
+RWStructuredBuffer<float> particle_J;
+RWStructuredBuffer<float4> particle_C;
+RWStructuredBuffer<float> particle_debug;
+StructuredBuffer<int> grid_vel_x;
+StructuredBuffer<int> grid_vel_y;
+
+int Nx;
+
+float dx;
+float dt;
+float E;
+
+float grid_vel_scale;
+
+[numthreads(256, 1, 1)]
+void CSMain(uint3 id : SV_DispatchThreadID)
+{
+    
+    float px = particle_pos[id.x].x * (float)Nx;
+    float py = particle_pos[id.x].y * (float)Nx;
+    
+    int bx = (px - 0.5f);
+    int by = (py - 0.5f);
+    float fx = px - bx;
+    float fy = py - by;
+    
+    float new_vel_x = 0;
+    float new_vel_y = 0;
+    float new_c00 = 0;
+    float new_c01 = 0;
+    float new_c10 = 0;
+    float new_c11 = 0;
+    
+    float wx0 = 0.5 * (1.5 - fx) * (1.5 - fx);
+    float wx1 = 0.75 - (fx - 1.0) * (fx - 1.0);
+    float wx2 = 0.5 * (fx - 0.5) * (fx - 0.5);
+    
+    float wy0 = 0.5 * (1.5 - fy) * (1.5 - fy);
+    float wy1 = 0.75 - (fy - 1.0) * (fy - 1.0);
+    float wy2 = 0.5 * (fy - 0.5) * (fy - 0.5);
+    
+    // 手动 unloop
+    int i = 0, j = 0;
+    float w = wx0 * wy0;
+    px = (i - fx) * dx;
+    py = (j - fy) * dx;
+    int idx = (by + j) * Nx + (bx + i);
+    new_vel_x += w * (float)grid_vel_x[idx]  ;
+    new_vel_y += w * (float)grid_vel_y[idx]  ;
+    new_c00 += 4 * Nx * Nx * w * grid_vel_x[idx]   * px;
+    new_c01 += 4 * Nx * Nx * w * grid_vel_x[idx]   * py;
+    new_c10 += 4 * Nx * Nx * w * grid_vel_y[idx]   * px;
+    new_c11 += 4 * Nx * Nx * w * grid_vel_y[idx] * py;
+    
+    particle_debug[id.x] = grid_vel_y[idx];
+    
+    i = 1;
+    w = wx1 * wy0;
+    px = (i - fx) * dx;
+    py = (j - fy) * dx;
+    idx = (by + j) * Nx + (bx + i);
+    new_vel_x += w * grid_vel_x[idx]  ;
+    new_vel_y += w * grid_vel_y[idx]  ;
+    new_c00 += 4 * Nx * Nx * w * grid_vel_x[idx]   * px;
+    new_c01 += 4 * Nx * Nx * w * grid_vel_x[idx]   * py;
+    new_c10 += 4 * Nx * Nx * w * grid_vel_y[idx]   * px;
+    new_c11 += 4 * Nx * Nx * w * grid_vel_y[idx]   * py;
+    
+    i = 2;
+    w = wx2 * wy0;
+    px = (i - fx) * dx;
+    py = (j - fy) * dx;
+    idx = (by + j) * Nx + (bx + i);
+    new_vel_x += w * grid_vel_x[idx]  ;
+    new_vel_y += w * grid_vel_y[idx]  ;
+    new_c00 += 4 * Nx * Nx * w * grid_vel_x[idx]   * px;
+    new_c01 += 4 * Nx * Nx * w * grid_vel_x[idx]   * py;
+    new_c10 += 4 * Nx * Nx * w * grid_vel_y[idx]   * px;
+    new_c11 += 4 * Nx * Nx * w * grid_vel_y[idx]   * py;
+    
+    i = 0;
+    j = 1;
+    w = wx0 * wy1;
+    px = (i - fx) * dx;
+    py = (j - fy) * dx;
+    idx = (by + j) * Nx + (bx + i);
+    new_vel_x += w * grid_vel_x[idx]  ;
+    new_vel_y += w * grid_vel_y[idx]  ;
+    new_c00 += 4 * Nx * Nx * w * grid_vel_x[idx]   * px;
+    new_c01 += 4 * Nx * Nx * w * grid_vel_x[idx]   * py;
+    new_c10 += 4 * Nx * Nx * w * grid_vel_y[idx]   * px;
+    new_c11 += 4 * Nx * Nx * w * grid_vel_y[idx]   * py;
+    
+    i = 1;
+    w = wx1 * wy1;
+    px = (i - fx) * dx;
+    py = (j - fy) * dx;
+    idx = (by + j) * Nx + (bx + i);
+    new_vel_x += w * grid_vel_x[idx]  ;
+    new_vel_y += w * grid_vel_y[idx]  ;
+    new_c00 += 4 * Nx * Nx * w * grid_vel_x[idx]   * px;
+    new_c01 += 4 * Nx * Nx * w * grid_vel_x[idx]   * py;
+    new_c10 += 4 * Nx * Nx * w * grid_vel_y[idx]   * px;
+    new_c11 += 4 * Nx * Nx * w * grid_vel_y[idx]   * py;
+    
+    i = 2;
+    w = wx2 * wy1;
+    px = (i - fx) * dx;
+    py = (j - fy) * dx;
+    idx = (by + j) * Nx + (bx + i);
+    new_vel_x += w * grid_vel_x[idx]  ;
+    new_vel_y += w * grid_vel_y[idx]  ;
+    new_c00 += 4 * Nx * Nx * w * grid_vel_x[idx]   * px;
+    new_c01 += 4 * Nx * Nx * w * grid_vel_x[idx]   * py;
+    new_c10 += 4 * Nx * Nx * w * grid_vel_y[idx]   * px;
+    new_c11 += 4 * Nx * Nx * w * grid_vel_y[idx]   * py;
+    
+    
+    i = 0;
+    j = 2;
+    w = wx0 * wy2;
+    px = (i - fx) * dx;
+    py = (j - fy) * dx;
+    idx = (by + j) * Nx + (bx + i);
+    new_vel_x += w * grid_vel_x[idx]  ;
+    new_vel_y += w * grid_vel_y[idx]  ;
+    new_c00 += 4 * Nx * Nx * w * grid_vel_x[idx]   * px;
+    new_c01 += 4 * Nx * Nx * w * grid_vel_x[idx]   * py;
+    new_c10 += 4 * Nx * Nx * w * grid_vel_y[idx]   * px;
+    new_c11 += 4 * Nx * Nx * w * grid_vel_y[idx]   * py;
+    
+    i = 1;
+    w = wx1 * wy2;
+    px = (i - fx) * dx;
+    py = (j - fy) * dx;
+    idx = (by + j) * Nx + (bx + i);
+    new_vel_x += w * grid_vel_x[idx]  ;
+    new_vel_y += w * grid_vel_y[idx]  ;
+    new_c00 += 4 * Nx * Nx * w * grid_vel_x[idx]   * px;
+    new_c01 += 4 * Nx * Nx * w * grid_vel_x[idx]   * py;
+    new_c10 += 4 * Nx * Nx * w * grid_vel_y[idx]   * px;
+    new_c11 += 4 * Nx * Nx * w * grid_vel_y[idx]   * py;
+    
+    i = 2;
+    w = wx2 * wy2;
+    px = (i - fx) * dx;
+    py = (j - fy) * dx;
+    idx = (by + j) * Nx + (bx + i);
+    new_vel_x += w * grid_vel_x[idx]  ;
+    new_vel_y += w * grid_vel_y[idx]  ;
+    new_c00 += 4 * Nx * Nx * w * grid_vel_x[idx]   * px;
+    new_c01 += 4 * Nx * Nx * w * grid_vel_x[idx]   * py;
+    new_c10 += 4 * Nx * Nx * w * grid_vel_y[idx]   * px;
+    new_c11 += 4 * Nx * Nx * w * grid_vel_y[idx]   * py;
+
+    
+    // 注意网格的速度放大了1000倍，因为要进行原子操作，只能int
+    
+    particle_vel[id.x].x = new_vel_x * grid_vel_scale;
+    particle_vel[id.x].y = new_vel_y * grid_vel_scale;
+    particle_pos[id.x].x = particle_pos[id.x].x + dt * particle_vel[id.x].x;
+    particle_pos[id.x].y = particle_pos[id.x].y + dt * particle_vel[id.x].y;
+    particle_C[id.x].x = new_c00 * grid_vel_scale;
+    particle_C[id.x].y = new_c01 * grid_vel_scale;
+    particle_C[id.x].z = new_c10 * grid_vel_scale;
+    particle_C[id.x].w = new_c11 * grid_vel_scale;
+    particle_J[id.x] = particle_J[id.x] * (1 + dt * (new_c00 + new_c11) * grid_vel_scale);
+    
+
+    
+
+}

@@ -1,0 +1,14 @@
+﻿// Each #kernel tells which function to compile; you can have many kernels
+#pragma kernel CSMain
+
+RWStructuredBuffer<int> grid_vel_x;
+RWStructuredBuffer<int> grid_vel_y;
+RWStructuredBuffer<int> grid_mass;
+
+[numthreads(256, 1, 1)]
+void CSMain(uint3 id : SV_DispatchThreadID)
+{
+    grid_vel_x[id.x] = 0;
+    grid_vel_y[id.x] = 0;
+    grid_mass[id.x] = 0;
+}

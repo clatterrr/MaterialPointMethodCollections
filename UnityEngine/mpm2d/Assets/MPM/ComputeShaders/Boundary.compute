@@ -1,0 +1,55 @@
+﻿// Each #kernel tells which function to compile; you can have many kernels
+#pragma kernel CSMain
+
+RWStructuredBuffer<int> grid_vel_x;
+RWStructuredBuffer<int> grid_vel_y;
+RWStructuredBuffer<int> grid_mass;
+RWStructuredBuffer<int> grid_obstacle;
+
+int Nx;
+int grid_vel_scale;
+int bound;
+float dt;
+
+[numthreads(256, 1, 1)]
+void CSMain (uint3 id : SV_DispatchThreadID)
+{
+    // 注意这是乘以1000倍后的int类型的速度
+    int ix = id.x % Nx;
+    int iy = id.x / Nx;
+    if(grid_mass[id.x] > 0)
+    {
+        // 速度 乘了 1000 倍， 权重也是1000倍
+       //grid_vel_x[id.x] = floor((float) grid_vel_x[id.x] / ((float) grid_mass[id.x] * 0.001f) * (float) grid_vel_scale * 0.001f);
+      //grid_vel_y[id.x] = floor((float) grid_vel_y[id.x] / ((float) grid_mass[id.x]*0.001f) * (float) grid_vel_scale * 0.001f);
+        
+        grid_vel_x[id.x] = floor((float) grid_vel_x[id.x] / (float) grid_mass[id.x] * (float) grid_vel_scale);
+        grid_vel_y[id.x] = floor((float) grid_vel_y[id.x] / (float) grid_mass[id.x] * (float) grid_vel_scale);
+    }
+    grid_vel_y[id.x] -= (9.8 * dt * (float)grid_vel_scale);
+    
+    if (ix > Nx - bound && grid_vel_x[id.x] > 0)
+    {
+        grid_vel_x[id.x] = 0;
+    }
+    
+    if (ix < bound && grid_vel_x[id.x] < 0)
+    {
+        grid_vel_x[id.x] = 0;
+    }
+    
+    if(iy > Nx - bound && grid_vel_y[id.x] > 0)
+    {
+        grid_vel_y[id.x] = 0;
+    }
+    
+    if(iy < bound && grid_vel_y[id.x] < 0)
+    {
+        grid_vel_y[id.x] = 0;
+    }
+   if (grid_obstacle[id.x] == 1)
+    {
+        grid_vel_x[id.x] = 0;
+        grid_vel_y[id.x] = 0;
+    }
+}
